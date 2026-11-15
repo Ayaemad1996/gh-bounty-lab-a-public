@@ -1,0 +1,31 @@
+name: Owner cache low-trust workflow_run probe
+
+on:
+  workflow_run:
+    workflows:
+      - Owner cache trusted trigger seed
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  low-trust-save-attempt:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.repository.full_name == 'Ayaemad1996/gh-bounty-lab-a-public' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate synthetic untrusted-event marker
+        run: |
+          mkdir -p boundary-cache
+          printf 'LOW_TRUST_EVENT_SYNTHETIC_NO_SECRET\n' > boundary-cache/marker.txt
+      - name: Attempt default-branch cache save with secure trigger defaults
+        uses: actions/cache/save@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-untrusted-workflowrun-cache-20261115-7ea426
+      - name: Note expected security behavior
+        run: |
+          echo "If the cache service grants read-only permission, save is rejected without stopping this job."
+          echo "This workflow does not request cache-mode: write and never handles secrets."
