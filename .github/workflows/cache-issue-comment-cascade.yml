@@ -1,0 +1,36 @@
+name: Owner issue-comment to workflow_run cache boundary
+
+on:
+  workflow_run:
+    workflows:
+      - Owner issue comment cache low-trust permission probe
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  attempt-default-branch-save:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'issue_comment' && github.event.workflow_run.repository.full_name == 'Ayaemad1996/gh-bounty-lab-a-public' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Log event type and enforced cache mode
+        env:
+          UPSTREAM_EVENT: ${{ github.event.workflow_run.event }}
+        run: |
+          echo "SOURCE_TRIGGER_EVENT=${UPSTREAM_EVENT}"
+          echo "CURRENT_TRIGGER_EVENT=${GITHUB_EVENT_NAME}"
+          echo "CASCADE_REF=${GITHUB_REF}"
+      - name: Create synthetic cascade marker
+        run: |
+          mkdir -p boundary-cache
+          printf 'CASCADE_FAKE_MARKER_NO_SECRET\n' > boundary-cache/marker.txt
+      - name: Attempt save under default cache trust rules
+        uses: actions/cache/save@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-issuecomment-cascade-20261115-f380c2
+      - name: End harmless verification
+        run: echo "CASCADE_PERMISSION_CHECK_FINISHED"
