@@ -1,0 +1,56 @@
+name: Called workflow - bounded write permission probe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  synthetic-write-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify caller permission ceiling with synthetic file
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEST_REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          url = "https://api.github.com/repos/" + os.environ["TEST_REPO"] + "/contents/SYNTHETIC_WRITE_TEST_ONLY.txt"
+          content = base64.b64encode(b"OWNER_CONTROLLED_NO_SECRET\n").decode()
+          request = urllib.request.Request(
+              url,
+              data=json.dumps({
+                  "message": "Synthetic only: permission-ceiling negative control",
+                  "content": content
+              }).encode(),
+              headers={
+                  "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "owned-permission-ceiling-probe"
+              },
+              method="PUT"
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=12) as response:
+                  code = response.status
+          except urllib.error.HTTPError as error:
+              code = error.code
+          print("Synthetic write request HTTP status:", code)
+          if code in (401, 403, 404):
+              print("PASS: called workflow could not gain write access")
+              sys.exit(0)
+          print("UNEXPECTED: inspect owner-only canary and caller token permissions")
+          sys.exit(2)
+          PY
