@@ -1,0 +1,39 @@
+name: Owned fork PR - workflow_run cache trust cascade
+
+on:
+  workflow_run:
+    workflows:
+      - Owned fork PR - synthetic cache scope control
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  fork-cascade-default-scope-probe:
+    if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prove upstream originated in different repository
+        env:
+          UPSTREAM_EVENT: ${{ github.event.workflow_run.event }}
+          UPSTREAM_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          TARGET_REPO: ${{ github.repository }}
+        run: |
+          echo "UPSTREAM_EVENT=${UPSTREAM_EVENT}"
+          echo "UPSTREAM_HEAD_REPOSITORY=${UPSTREAM_REPO}"
+          echo "BASE_REPOSITORY=${TARGET_REPO}"
+          echo "CASCADE_EVENT=${GITHUB_EVENT_NAME}"
+          echo "CASCADE_REF=${GITHUB_REF}"
+      - name: Create nonsecret cache marker
+        run: |
+          mkdir -p cache-probe
+          printf 'OWNED_FORK_PR_CASCADE_SYNTHETIC_NO_SECRET\n' > cache-probe/marker.txt
+      - name: Test default branch cache write rule without overrides
+        uses: actions/cache/save@v4
+        with:
+          path: cache-probe/marker.txt
+          key: owned-fork-pr-cascade-main-20261115-0b6f23
+      - name: Finish without processing outside user code
+        run: echo "FORK_PR_CASCADE_FINISHED_NO_SECRETS"
