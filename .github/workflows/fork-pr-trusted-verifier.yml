@@ -1,0 +1,58 @@
+name: Owned fork PR - trusted cache boundary verifier
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-trusted-positive-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create fake trusted cache marker
+        run: |
+          mkdir -p cache-probe
+          printf 'OWNED_TRUSTED_SYNTHETIC_MARKER_NO_SECRET\n' > cache-probe/marker.txt
+      - name: Save normal trusted main cache
+        uses: actions/cache/save@v4
+        with:
+          path: cache-probe/marker.txt
+          key: owned-fork-pr-trusted-control-20261115-0b6f23
+  check-trust-boundary:
+    needs: create-trusted-positive-control
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    cache-mode: read
+    steps:
+      - name: Confirm legitimate main cache exists
+        id: control
+        uses: actions/cache/restore@v4
+        with:
+          path: cache-probe/marker.txt
+          key: owned-fork-pr-trusted-control-20261115-0b6f23
+          lookup-only: 'true'
+      - name: Look up only forbidden default branch key
+        id: cascade
+        uses: actions/cache/restore@v4
+        with:
+          path: cache-probe/marker.txt
+          key: owned-fork-pr-cascade-main-20261115-0b6f23
+          lookup-only: 'true'
+      - name: Evaluate response without reading cache files
+        env:
+          CONTROL_HIT: ${{ steps.control.outputs.cache-hit }}
+          CASCADE_HIT: ${{ steps.cascade.outputs.cache-hit }}
+        run: |
+          echo "OWNER_TRUSTED_CONTROL_HIT=${CONTROL_HIT}"
+          echo "UNTRUSTED_CASCADE_MAIN_HIT=${CASCADE_HIT}"
+          if [ "${CONTROL_HIT}" != "true" ]; then
+            echo "INVALID_POSITIVE_CONTROL"
+            exit 1
+          fi
+          if [ "${CASCADE_HIT}" = "true" ]; then
+            echo "REQUIRES_INDEPENDENT_REVIEW_CHECK_ACTOR_AND_SCOPE"
+            exit 2
+          fi
+          echo "PASS_NOT_VISIBLE_TO_MAIN"
