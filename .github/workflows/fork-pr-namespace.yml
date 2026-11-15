@@ -1,0 +1,36 @@
+name: Owned fork PR - synthetic cache scope control
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  fork-pr-namespace-check:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record event boundary without executing fork content
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          echo "TEST_EVENT=${GITHUB_EVENT_NAME}"
+          echo "TEST_REF=${GITHUB_REF}"
+          echo "TEST_PR=${PR_NUMBER}"
+          echo "FORK_HEAD_REPO=${HEAD_REPO}"
+          echo "No checkout, no external scripts, no credentials"
+      - name: Generate synthetic nonsecret PR marker
+        run: |
+          mkdir -p cache-probe
+          printf 'OWNED_FORK_PR_SYNTHETIC_MARKER_NO_SECRET\n' > cache-probe/marker.txt
+      - name: Attempt PR-scoped cache save only
+        uses: actions/cache/save@v4
+        with:
+          path: cache-probe/marker.txt
+          key: owned-fork-pr-cache-20261115-${{ github.event.pull_request.number }}-fc29d6
+      - name: Finish safe scope probe
+        run: echo "PR_CACHE_TEST_COMPLETE_NO_CODE_FROM_FORK_EXECUTED"
