@@ -1,0 +1,39 @@
+name: Synthetic artifact name validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-name:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create artificial text
+        run: printf 'SYNTHETIC-NONSECRET\n' > harmless.txt
+
+      - name: Known-good artifact
+        id: baseline
+        uses: actions/upload-artifact@v7
+        with:
+          name: safe-validation
+          path: harmless.txt
+          retention-days: 1
+
+      - name: Test dot-dot name (no real secrets)
+        id: dotdot
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: '..'
+          path: harmless.txt
+          retention-days: 1
+
+      - name: Summarize outcome
+        if: always()
+        run: |
+          echo "Baseline outcome: ${{ steps.baseline.outcome }}"
+          echo "Dot-dot outcome: ${{ steps.dotdot.outcome }}"
+          echo "The only file is a disposable synthetic nonsecret marker."
