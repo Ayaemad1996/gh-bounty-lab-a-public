@@ -1,0 +1,8 @@
+name: Owned public caller - private reusable (expected resolution rejection)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  call-private:
+    uses: Ayaemad1996/gh-bounty-lab-b-private/.github/workflows/private-reusable.yml@main
