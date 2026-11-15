@@ -1,0 +1,32 @@
+name: Owner issue comment cache low-trust permission probe
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-default-trust:
+    if: ${{ github.event.issue.number == 1 && github.event.comment.user.login == 'Ayaemad1996' && contains(github.event.comment.body, 'LAB_CACHE_TEST_20261115') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print safe cache mode metadata
+        run: |
+          echo "WORKFLOW_EVENT=${GITHUB_EVENT_NAME}"
+          echo "CACHE_EFFECTIVE_MODE=${ACTIONS_CACHE_MODE:-unset}"
+          echo "REFERENCE_NAME=${GITHUB_REF}"
+      - name: Generate fake cache data
+        run: |
+          mkdir -p boundary-cache
+          printf 'ISSUE_COMMENT_OWNER_SYNTHETIC_NO_SECRET\n' > boundary-cache/marker.txt
+      - name: Attempt cache save under default issue-comment permissions
+        uses: actions/cache/save@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-issue-comment-cache-20261115-2d87b4
+      - name: Finish only metadata probe
+        run: |
+          echo "TEST_END: no workflow override, no real data, no shared files"
