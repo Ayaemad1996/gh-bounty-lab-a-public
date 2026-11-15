@@ -1,0 +1,58 @@
+name: Owner cache trusted trigger seed
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trusted-cache-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate synthetic trusted marker
+        run: |
+          mkdir -p boundary-cache
+          printf 'TRUSTED_OWNER_SYNTHETIC_NO_SECRET\n' > boundary-cache/marker.txt
+      - name: Save trusted default-branch cache
+        uses: actions/cache/save@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-trusted-cache-20261115-7ea426
+
+  inspect-cache-boundary:
+    needs: trusted-cache-control
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify trusted cache exists
+        id: trusted
+        uses: actions/cache/restore@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-trusted-cache-20261115-7ea426
+          lookup-only: 'true'
+      - name: Verify untrusted workflow_run cache is absent
+        id: untrusted
+        uses: actions/cache/restore@v4
+        with:
+          path: boundary-cache/marker.txt
+          key: owner-untrusted-workflowrun-cache-20261115-7ea426
+          lookup-only: 'true'
+      - name: Report cache permission boundary only as HTTP outcomes
+        env:
+          TRUSTED_HIT: ${{ steps.trusted.outputs.cache-hit }}
+          UNTRUSTED_HIT: ${{ steps.untrusted.outputs.cache-hit }}
+        run: |
+          echo "TRUSTED_CACHE_FOUND=${TRUSTED_HIT}"
+          echo "UNTRUSTED_CACHE_FOUND=${UNTRUSTED_HIT}"
+          if [ "${TRUSTED_HIT}" != "true" ]; then
+            echo "INVALID_BASELINE_TRUSTED_MISSING"
+            exit 1
+          fi
+          if [ "${UNTRUSTED_HIT}" = "true" ]; then
+            echo "UNEXPECTED_UNTRUSTED_CACHE_FOUND; VERIFY CACHE ORIGIN BEFORE BUG CLAIM"
+            exit 2
+          fi
+          echo "PASS_DEFAULT_BRANCH_LOW_TRUST_CACHE_ISOLATION"
