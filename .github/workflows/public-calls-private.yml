@@ -1,0 +1,10 @@
+name: Public caller to private reusable workflow - access negative control
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  call-private:
+    uses: Ayaemad1996/gh-bounty-lab-b-private/.github/workflows/reusable-private.yml@main
